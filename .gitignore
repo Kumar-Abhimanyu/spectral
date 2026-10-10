@@ -201,6 +201,10 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+# Local trace metadata
+*.sqlite3
+*.sqlite3-*
+
 # Marimo
 marimo/_static/
 marimo/_lsp/
