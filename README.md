@@ -2,8 +2,8 @@
 
 Local observability for LLM calls. Store trace metadata in SQLite and inspect
 latency, token usage, errors, and estimated costs from the command line.
-This milestone implements persistence and reporting; provider trackers and the
-dashboard remain placeholders.
+Includes SQLite persistence, CLI reporting, and opt-in synchronous OpenAI Chat
+Completions instrumentation. Other provider adapters and the dashboard remain placeholders.
 
 ## Install
 
@@ -42,6 +42,44 @@ with TraceStore("traces.sqlite3") as store:
 tags, error details, and usage metadata survive reopening the database.
 Timestamps are stored in UTC. Existing naive timestamps are interpreted as UTC.
 Use a separate `TraceStore` connection per thread and close it with `with`.
+
+## Instrument OpenAI calls
+
+Install the optional SDK extra: `python -m pip install -e '.[openai]'`.
+Inject your existing synchronous client and store:
+
+```python
+from openai import OpenAI
+from spectral.storage import TraceStore
+from spectral.trackers import OpenAITracker
+
+with OpenAI() as client, TraceStore("traces.sqlite3") as store:
+    tracker = OpenAITracker(client, store, tags={"application": "support"})
+    response = tracker.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": "Hello"}],
+        tags={"feature": "chat"},
+    )
+```
+
+`create` forwards request arguments to `client.chat.completions.create` and
+returns the original response object. It records provider, returned model
+(falling back to the requested model), UTC start time, token usage, estimated
+cost, elapsed request time, status, and optional tags. Call tags override default
+tags; nested values are snapshotted before the request. Tags must be JSON-compatible
+with string keys and finite numeric values. No prompts, completions, API keys,
+request headers, or provider exception messages are captured. Failure traces
+contain only the exception class name. Keep sensitive data out of tags.
+
+Provider exceptions propagate unchanged. Storage or metadata failures emit a
+generic warning without exception details and preserve the provider's result;
+those calls may have no trace. Missing or invalid usage counts become zero, so
+zero tokens does not prove a call was free. Costs use the existing static table;
+snapshot model names and unknown models can report zero. Latency includes SDK
+retries but excludes trace persistence. Streaming is rejected before a request;
+asynchronous clients, Responses API, raw responses, and other providers are
+outside this adapter's scope. Do not pass an asynchronous callable disguised as
+a synchronous client. Use one store per thread.
 
 ## Inspect traces
 
@@ -83,6 +121,6 @@ Unicode metadata, UTC time filters, parameterized queries, CLI errors, and summa
 
 ## Next milestones
 
-1. Add a provider adapter that records successful and failed calls.
+1. Add async and streaming instrumentation, then Anthropic and Ollama adapters.
 2. Add request correlation, configurable cost rates, and latency comparisons.
 3. Add a terminal dashboard, followed by trace export and retention policies.

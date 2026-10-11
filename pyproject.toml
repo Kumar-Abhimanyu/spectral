@@ -10,6 +10,9 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
 
+[project.optional-dependencies]
+openai = ["openai>=1.50,<3"]
+
 [project.scripts]
 spectral = "spectral.cli:main"
 
