@@ -75,7 +75,7 @@ class CliTests(unittest.TestCase):
         data = json.loads(self.invoke("traces", "--json", "--limit", "1"))
         self.assertEqual([t["id"] for t in data], ["two"])
         self.assertIn("ollama/local", self.invoke("traces", "--provider", "ollama"))
-        self.assertIn("Calls: 2 (1 success, 1 errors)", self.invoke("summary"))
+        self.assertIn("Calls: 2 (1 success, 0 partial, 1 errors)", self.invoke("summary"))
 
     def test_empty_results(self):
         self.assertEqual(self.invoke("traces", "--model", "missing").strip(), "No matching traces.")

@@ -116,7 +116,7 @@ class AsyncOpenAITrackerTests(unittest.IsolatedAsyncioTestCase):
     async def test_validation_before_provider(self):
         create = AsyncMock()
         tracker = AsyncOpenAITracker(client_with(create), self.store)
-        for kwargs in [dict(model="gpt-4o", stream=True), dict(model=""), dict(model=None),
+        for kwargs in [dict(model=""), dict(model=None),
                        dict(model=7), dict(model="gpt-4o", tags=[]),
                        dict(model="gpt-4o", tags={1: "bad"}),
                        dict(model="gpt-4o", tags={"x": float("nan")})]:
