@@ -11,6 +11,7 @@ from typing import Any
 
 from spectral.storage import TraceStore
 from spectral.trackers._common import copy_tags, prepare_request, record_call
+from spectral.trackers._streaming import AsyncTrackedStream
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +35,7 @@ class AsyncOpenAITracker:
     async def create(self, *, tags: dict | None = None, **kwargs: Any) -> Any:
         """Call chat.completions.create once and persist usage, timing and status.
 
-        Call tags override constructor tags. Streaming is rejected before any
-        request. Prompts, completions, credentials and exception messages are
+        Call tags override constructor tags. Streaming returns a lifecycle wrapper. Prompts, completions, credentials and exception messages are
         never copied to the trace. Tags are explicitly user-supplied metadata.
         """
         model, trace_tags = prepare_request(self._tags, tags, kwargs, "AsyncOpenAITracker")
@@ -51,6 +51,8 @@ class AsyncOpenAITracker:
             latency_ms = (time.perf_counter() - start) * 1000
             self._record(model, timestamp, latency_ms, trace_tags, error=exc)
             raise
+        if kwargs.get("stream"):
+            return AsyncTrackedStream(response, self._store, logger, model, timestamp, start, trace_tags)
         latency_ms = (time.perf_counter() - start) * 1000
         self._record(model, timestamp, latency_ms, trace_tags, response=response)
         return response

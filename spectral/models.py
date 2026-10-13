@@ -14,6 +14,7 @@ class Provider(str, Enum):
 class Status(str, Enum):
     SUCCESS = "success"
     ERROR = "error"
+    PARTIAL = "partial"
 
 
 # Cost per 1000 tokens (input, output) in USD
@@ -73,7 +74,7 @@ class Trace:
 
     def __post_init__(self):
         # Auto-estimate cost if not explicitly set
-        if self.cost_usd == 0.0 and self.status == Status.SUCCESS:
+        if self.cost_usd == 0.0 and self.status != Status.ERROR:
             self.cost_usd = estimate_cost(
                 self.model, self.input_tokens, self.output_tokens
             )
@@ -116,6 +117,7 @@ class AggregatedStats:
     total_calls:     int   = 0
     success_calls:   int   = 0
     error_calls:     int   = 0
+    partial_calls:   int   = 0
 
     total_tokens:    int   = 0
     total_input:     int   = 0
@@ -169,6 +171,7 @@ class AggregatedStats:
         return cls(
             total_calls    = n,
             success_calls  = sum(1 for t in traces if t.status == Status.SUCCESS),
+            partial_calls  = sum(t.status == Status.PARTIAL for t in traces),
             error_calls    = sum(1 for t in traces if t.status == Status.ERROR),
             total_tokens   = sum(t.total_tokens  for t in traces),
             total_input    = sum(t.input_tokens  for t in traces),

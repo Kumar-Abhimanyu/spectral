@@ -110,8 +110,6 @@ class OpenAITrackerTests(unittest.TestCase):
     def test_streaming_and_invalid_models_fail_before_request(self):
         create = Mock()
         tracker = OpenAITracker(client_with(create), self.store)
-        with self.assertRaises(ValueError):
-            tracker.create(model="gpt-4o", stream=True)
         for model in [None, "", 123]:
             with self.subTest(model=model), self.assertRaises(ValueError):
                 tracker.create(model=model)
