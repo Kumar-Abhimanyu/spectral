@@ -33,6 +33,7 @@ class TraceStore:
         self._connection.row_factory = sqlite3.Row
         try:
             with self._connection:
+                self._connection.execute("BEGIN")
                 self._connection.execute(
                     """CREATE TABLE IF NOT EXISTS traces (
                         id TEXT PRIMARY KEY NOT NULL,
