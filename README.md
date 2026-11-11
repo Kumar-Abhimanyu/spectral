@@ -76,7 +76,7 @@ generic warning without exception details and preserve the provider's result;
 those calls may have no trace. Missing or invalid usage counts become zero, so
 zero tokens does not prove a call was free. Costs use the existing static table;
 snapshot model names and unknown models can report zero. Latency includes SDK
-retries but excludes trace persistence. Streaming is rejected before a request;
+retries but excludes trace persistence. Streaming returns a lifecycle wrapper;
 asynchronous clients, Responses API, raw responses, and other providers are
 outside this adapter's scope. Do not pass an asynchronous callable disguised as
 a synchronous client. Use one store per thread.
@@ -115,9 +115,64 @@ may share a tracker and store; each call has independent tags and timing.
 Create, use, and close the store on that same thread. SQLite writes are synchronous
 and may briefly block the event loop (including waiting for a database lock).
 This adapter does not offload writes to worker threads or add a storage queue.
-Streaming, Responses API, and async callables hidden behind wrappers without
+Responses API and async callables hidden behind wrappers without
 `__wrapped__` remain unsupported. Privacy, usage fallbacks, static cost estimates,
 and best-effort recording limitations are the same as for `OpenAITracker`.
+
+## Track streaming calls
+
+For usage accounting, request `stream_options={"include_usage": True}` explicitly.
+Spectral forwards these arguments unchanged; it never changes chunks or buffers
+message content. Use a context manager so early exits close provider resources:
+
+```python
+with tracker.create(
+    model="gpt-4o-mini", messages=messages, stream=True,
+    stream_options={"include_usage": True},
+) as stream:
+    for chunk in stream:
+        handle_chunk(chunk)
+```
+
+With an `AsyncOpenAITracker`:
+
+```python
+async with await tracker.create(
+    model="gpt-4o-mini", messages=messages, stream=True,
+    stream_options={"include_usage": True},
+) as stream:
+    async for chunk in stream:
+        handle_chunk(chunk)
+```
+
+A trace is finalized once on normal iterator exhaustion (`success`), explicit
+close or early context exit (`partial`), or provider error/cancellation (`error`).
+The wrapper preserves chunk and exception identity. A caller exception inside
+the context produces `partial`, while cancellation produces `error` with only
+`CancelledError` as its error type. Errors while closing propagate unless another
+exception is already being propagated. Repeated close is a no-op. Sync wrappers
+provide `close()`; async wrappers provide awaitable `close()` and `aclose()`.
+The full lifetime from request start through consumption and normal cleanup is
+measured, including caller processing time. Error latency is measured before
+best-effort failure cleanup.
+
+Usage comes from the most recent provider usage chunk and is snapshotted as
+numeric metadata; it is not accumulated per chunk. No final usage means zero
+reported tokens, not a free request. Partial streams can retain observed usage;
+static cost estimates retain their existing limitations. Errors retain observed
+tokens but keep the existing zero error-cost behavior. CLI summaries now show
+partial calls separately and support `--status partial`. Old Spectral versions
+cannot read traces with this new status. SQLite's existing TEXT status column
+requires no migration.
+
+Always use the context manager or close explicitly. Breaking a bare iterator,
+abandoning a wrapper, or terminating the process does not reliably finalize a
+trace or close the stream. Iterator exhaustion represents provider EOF; Spectral
+does not independently verify a finish reason or a server-side completion.
+Wrappers expose iteration and resource closure, not the full SDK Stream API.
+Use each stream on one thread/task; concurrent consumption of one stream is
+unsupported. Different streams may run concurrently on their store's owning
+thread. SQLite writes remain synchronous and can block the event loop.
 
 ## Inspect traces
 
@@ -159,6 +214,6 @@ Unicode metadata, UTC time filters, parameterized queries, CLI errors, and summa
 
 ## Next milestones
 
-1. Add streaming instrumentation, then Anthropic and Ollama adapters.
+1. Add Anthropic and Ollama adapters.
 2. Add request correlation, configurable cost rates, and latency comparisons.
 3. Add a terminal dashboard, followed by trace export and retention policies.

@@ -62,7 +62,7 @@ def main(argv: list[str] | None = None) -> int:
                     print(json.dumps(data, indent=2))
                 else:
                     print(
-                        f"Calls: {stats.total_calls} ({stats.success_calls} success, {stats.error_calls} errors)"
+                        f"Calls: {stats.total_calls} ({stats.success_calls} success, {stats.partial_calls} partial, {stats.error_calls} errors)"
                     )
                     print(
                         f"Tokens: {stats.total_tokens} ({stats.total_input} input, {stats.total_output} output)"

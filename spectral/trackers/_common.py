@@ -18,8 +18,6 @@ def copy_tags(tags: dict) -> dict:
 
 
 def prepare_request(default_tags: dict, tags: dict | None, kwargs: dict, adapter: str) -> tuple[str, dict]:
-    if kwargs.get("stream"):
-        raise ValueError(f"Streaming is not supported by {adapter}")
     model = kwargs.get("model")
     if not isinstance(model, str) or not model:
         raise ValueError("model must be a nonempty string")
@@ -29,10 +27,11 @@ def prepare_request(default_tags: dict, tags: dict | None, kwargs: dict, adapter
 def record_call(
     store: TraceStore, logger: logging.Logger, model: str, timestamp: datetime,
     latency_ms: float, tags: dict, *, response: Any = None, error: BaseException | None = None,
+    status: Status | None = None,
 ) -> None:
     try:
         input_tokens = output_tokens = 0
-        if error is None:
+        if response is not None:
             response_model = getattr(response, "model", None)
             if isinstance(response_model, str) and response_model:
                 model = response_model
@@ -48,7 +47,7 @@ def record_call(
             timestamp=timestamp,
             provider=Provider.OPENAI,
             model=model,
-            status=Status.ERROR if error is not None else Status.SUCCESS,
+            status=status if status is not None else (Status.ERROR if error is not None else Status.SUCCESS),
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             latency_ms=latency_ms,
